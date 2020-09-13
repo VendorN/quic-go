@@ -448,7 +448,7 @@ func (p *packetPacker) maybeAppendCryptoPacket(buffer *packetBuffer, maxPacketSi
 	remainingLen -= hdr.GetLength(p.version)
 	if hasRetransmission {
 		for {
-			var f wire.Frame
+			var f *ackhandler.Frame
 			switch encLevel {
 			case protocol.EncryptionInitial:
 				f = p.retransmissionQueue.GetInitialFrame(remainingLen)
@@ -458,7 +458,7 @@ func (p *packetPacker) maybeAppendCryptoPacket(buffer *packetBuffer, maxPacketSi
 			if f == nil {
 				break
 			}
-			payload.frames = append(payload.frames, &ackhandler.Frame{Frame: f})
+			payload.frames = append(payload.frames, f)
 			frameLen := f.Length(p.version)
 			payload.length += frameLen
 			remainingLen -= frameLen
@@ -544,7 +544,7 @@ func (p *packetPacker) composeNextPacket(maxFrameSize protocol.ByteCount, ackAll
 			if f == nil {
 				break
 			}
-			payload.frames = append(payload.frames, &ackhandler.Frame{Frame: f})
+			payload.frames = append(payload.frames, f)
 			payload.length += f.Length(p.version)
 		}
 	}
