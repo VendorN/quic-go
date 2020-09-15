@@ -8,6 +8,7 @@ import (
 	"hash"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/lucas-clemente/quic-go/internal/protocol"
@@ -53,6 +54,28 @@ type packetHandlerMap struct {
 
 var _ packetHandlerManager = &packetHandlerMap{}
 
+func printBufferSize(c net.PacketConn) {
+	conn, ok := c.(interface {
+		SyscallConn() (syscall.RawConn, error)
+	})
+	if !ok {
+		return
+	}
+	rawConn, err := conn.SyscallConn()
+	if err != nil {
+		panic(err)
+	}
+	if err := rawConn.Control(func(fd uintptr) {
+		val, err := syscall.GetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("UDP Receive buffer size:", val)
+	}); err != nil {
+		panic(err)
+	}
+}
+
 func newPacketHandlerMap(
 	c net.PacketConn,
 	connIDLen int,
@@ -64,6 +87,13 @@ func newPacketHandlerMap(
 	if err != nil {
 		return nil, err
 	}
+	printBufferSize(c)
+	if conn, ok := c.(interface{ SetReadBuffer(int) error }); ok {
+		if err := conn.SetReadBuffer(1 << 20); err != nil {
+			panic(err)
+		}
+	}
+	printBufferSize(c)
 	m := &packetHandlerMap{
 		conn:                       conn,
 		connIDLen:                  connIDLen,
